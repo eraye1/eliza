@@ -25,14 +25,15 @@ import { TwitterGenerationClient } from "./clients/twitter/generate.ts";
 interface Arguments {
   character?: string;
   characters?: string;
-  //twitter?: boolean;
   discord?: boolean;
-  telegram?: boolean; // Added telegram option
+  telegram?: boolean;
+  port?: number;
 }
 
 let argv: Arguments = {
   character: "./src/agent/default_character.json",
   characters: "",
+  port: 3000,
 };
 
 try {
@@ -50,6 +51,11 @@ try {
       type: "boolean",
       description: "Enable Telegram client",
       default: false,
+    })
+    .option("port", {
+      type: "number",
+      description: "Port number for the server",
+      default: 3000,
     })
     .parseSync() as Arguments;
 } catch (error) {
@@ -69,7 +75,7 @@ console.log("characterPaths", characterPaths);
 const characters = [];
 
 const directClient = new DirectClient();
-directClient.start(3000);
+directClient.start(argv.port);
 
 if (characterPaths?.length > 0) {
   for (const path of characterPaths) {
@@ -108,7 +114,7 @@ async function startAgent(character: Character) {
       mute_room,
     ],
   });
-
+  console.log("runtime", runtime);
   const directRuntime = new AgentRuntime({
     databaseAdapter: db,
     token:
