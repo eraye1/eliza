@@ -21,6 +21,37 @@ import { wait } from "./clients/twitter/utils.ts";
 import { TwitterSearchClient } from "./clients/twitter/search.ts";
 import { TwitterInteractionClient } from "./clients/twitter/interactions.ts";
 import { TwitterGenerationClient } from "./clients/twitter/generate.ts";
+import { TwitterOAuthClient } from "./clients/twitter_oauth/base.ts";
+import TwitterOAuthIntegration from "./clients/twitter_oauth/index.ts";
+
+// Add at the top of the file
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error);
+  console.error('Stack:', error.stack);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise);
+  console.error('Reason:', reason);
+});
+
+// Use import.meta.url for module paths instead of module.paths
+console.log('Current directory:', process.cwd());
+console.log('Script path:', import.meta.url);
+console.log('Node version:', process.version);
+console.log('Env:', process.env.NODE_ENV);
+
+// Add ONNX cleanup handler
+process.on('exit', () => {
+  // Clean up ONNX runtime resources
+  try {
+    if (global.ort) {
+      global.ort.cleanupRuntime();
+    }
+  } catch (error) {
+    console.error('Error cleaning up ONNX runtime:', error);
+  }
+});
 
 interface Arguments {
   character?: string;
@@ -217,6 +248,42 @@ async function startAgent(character: Character) {
    clients.push(
      twitterInteractionClient, twitterSearchClient, twitterGenerationClient,
    );
+  }
+
+  if (character.clients.map((str) => str.toLowerCase()).includes("twitter_oauth")) {
+    console.log("🔄 Initializing Twitter OAuth client...");
+    try {
+      const twitterConfig = {
+        accessToken: character.settings?.secrets?.TWITTER_ACCESS_TOKEN,
+        refreshToken: character.settings?.secrets?.TWITTER_REFRESH_TOKEN,
+        username: character.settings?.secrets?.TWITTER_USERNAME,
+      };
+
+      if (twitterConfig.accessToken && twitterConfig.refreshToken && twitterConfig.username) {
+        console.log("🔄 Twitter OAuth client configuration:", {
+          username: twitterConfig.username,
+          nodeVersion: process.version,
+          cwd: process.cwd(),
+        });
+        
+        try {
+          const twitterClient = new TwitterOAuthIntegration(
+            { runtime: runtime },
+            twitterConfig
+          );
+          clients.push(twitterClient); 
+          console.log("✅ Twitter OAuth client initialized successfully");
+        } catch (initError) {
+          console.error("❌ Twitter client initialization failed:", initError);
+          // Continue without Twitter client
+        }
+      } else {
+        console.log("❌ Missing Twitter OAuth credentials");
+      }
+    } catch (error) {
+      console.error("❌ Error in Twitter OAuth setup:", error);
+      // Continue without Twitter client
+    }
   }
 
   directClient.registerAgent(directRuntime);
